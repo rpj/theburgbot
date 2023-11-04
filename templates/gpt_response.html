@@ -1,0 +1,128 @@
+<html>
+  <title>LLM prompt response</title>
+  <head>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style type="text/css">
+      @import url("https://fonts.googleapis.com/css?family=Lora:400,500,700");
+
+      body {
+        color: white;
+        background-color: #2c2c2c;
+        font-family: 'Helvetica Light', Helvetica, sans-serif;
+      }
+      .mono {
+        font-family: monospace;
+      }
+      .msg {
+        color: white;
+      }
+      .nick {
+        color: #55c8ff;
+      }
+      .target {
+        color: #32a882;
+      }
+
+      a {
+        color: #32a882;
+      }
+
+      a:hover {
+        color: #55c8ff;
+      }
+
+      blockquote {
+        border-radius: 0.2em;
+        padding: 1em;
+        font-family: Lora;
+        background: rgb(72, 83, 93);
+      }
+
+      #prompt {
+        font-weight: bold;
+      }
+
+      #response {
+        background-color: rgb(92, 106, 119);
+      }
+
+      #info {
+        width: 20vw;
+        min-width: 400px;
+      }
+
+      /* https://codepen.io/davidelrizzo/pen/eJwqzp */
+      .Rtable {
+        display: flex;
+        flex-wrap: wrap;
+        padding: 0;
+        font-size: 0.8em;
+      }
+
+      .Rtable-cell {
+        box-sizing: border-box;
+        flex-grow: 1;
+        width: 100%;
+        padding: 0.8em 1.2em;
+        overflow: hidden;
+        list-style: none;
+        background: fade(slategrey,20%);
+      }
+
+      .Rtable--2cols > .Rtable-cell  { width: 50%; }
+      .Rtable--3cols > .Rtable-cell  { width: 33.33%; }
+      .Rtable--4cols > .Rtable-cell  { width: 25%; }
+      .Rtable--5cols > .Rtable-cell  { width: 20%; }
+      .Rtable--6cols > .Rtable-cell  { width: 16.6%; }
+      
+      .Rtable--1cols-cell  { width: 63.4%; }
+      .Rtable--2cols-cell  { width: 50%; }
+      .Rtable--3cols-cell  { width: 33.33%; }
+      .Rtable--4cols-cell  { width: 25%; }
+      .Rtable--5cols-cell  { width: 20%; }
+      .Rtable--6cols-cell  { width: 16.6%; }
+      .Rtable--7cols-cell  { width: 10%; }
+
+      /*https://css-tricks.com/accessible-simple-responsive-tables/#article-header-id-2 */
+
+      @media all and (max-width: 600px) {
+        .Rtable--collapse  {
+          display: block;
+        }
+        .Rtable-cell { width: 100% !important; }
+        .Rtable-cell--foot { margin-bottom: 1em; }
+      }
+
+      .Rtable-cell--head { 
+        background-color: rgb(64 67 69);
+        border-color: darken(grey,10%);
+      }
+
+      h3 {
+        border-bottom: 1px dotted white;
+        margin: 1em;
+      }
+    </style>
+  </head>
+  <body>
+    <h3>Prompt</h3>
+    <blockquote id="prompt">
+      {{ prompt }}
+    </blockquote>
+
+    <h3>Response</h3>
+    <blockquote id="response">
+      {{{ response }}}
+    </blockquote>
+
+    <br/>
+
+    via <b><a href="{{{ model.sourceURL }}}" target="_blank">{{ model.displayName }}</a></b> with model "<b>{{ model.name }}</b>".
+
+    <br/>
+    <br/>
+    <hr />
+    
+    This document was generated at {{ captureTimestamp }}.
+  </body>
+</html>

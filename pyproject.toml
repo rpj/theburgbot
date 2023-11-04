@@ -1,18 +1,33 @@
 [tool.poetry]
 name = "theburgbot"
-version = "0.1.0"
+version = "1.0.0"
 description = ""
 authors = ["Ryan Joseph <ryan@electricsheep.co>"]
 readme = "README.md"
 
+[tool.poetry.scripts]
+main = "theburgbot.main:main"
+
 [tool.poetry.dependencies]
 python = "^3.8"
 discord = "^2.3.2"
+nltk = "^3.8.1"
+aiosqlite = "^0.19.0"
+aiohttp = "^3.8.6"
+requests = "^2.31.0"
+chevron = "^0.14.0"
+openai = "^0.28.1"
+httpx = "^0.25.1"
+pylint = "^3.0.2"
+mistune = "^3.0.2"
+nanoid = "^2.0.0"
 
 
 [tool.poetry.group.dev.dependencies]
 black = "^23.10.1"
 isort = "^5.12.0"
+pytest = "^7.4.3"
+pytest-asyncio = "^0.21.1"
 
 [build-system]
 requires = ["poetry-core"]
