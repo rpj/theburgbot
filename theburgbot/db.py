@@ -174,7 +174,7 @@ class TheBurgBotDB:
     async def get_users_http_statics(self, user_id):
         async with aiosqlite.connect(self.db_path) as db:
             cursor = await db.execute(
-                "select created, updated, pub_id, from_command from http_static where from_user_id = ?",
+                "select created, updated, pub_id, from_command, title from http_static where from_user_id = ?",
                 (user_id,),
             )
             await db.commit()
@@ -186,6 +186,7 @@ class TheBurgBotDB:
         from_command,
         template,
         src_obj,
+        title,
     ) -> str:
         now = datetime.datetime.now()
         tmpl_path = (
@@ -195,7 +196,7 @@ class TheBurgBotDB:
             async with aiosqlite.connect(self.db_path) as db:
                 new_id = nanoid.generate()
                 await db.execute(
-                    "insert into http_static values (?, ?, ?, ?, ?, ?, ?, ?)",
+                    "insert into http_static values (?, ?, ?, ?, ?, ?, ?, ?, ?)",
                     (
                         now,
                         None,
@@ -205,6 +206,7 @@ class TheBurgBotDB:
                         chevron.render(tmpl_f, src_obj),
                         template,
                         json.dumps(src_obj),
+                        title,
                     ),
                 )
                 await db.commit()

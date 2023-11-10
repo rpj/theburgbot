@@ -3,6 +3,8 @@ import discord
 from theburgbot import constants
 from theburgbot.db import TheBurgBotDB
 
+TITLE_TRUNC_LEN = 256
+
 
 async def user_cmd_handler(
     command_create_internal_logger,
@@ -18,7 +20,9 @@ async def user_cmd_handler(
         )
         msg += "\n".join(
             [
-                f"* From `/{row[3]}`: [{row[2]}]({constants.SITE_URL.lower()}/{constants.USER_STATIC_HTTP_PATH}/{row[2]}) "
+                "* ["
+                + (f'"_{row[4][:TITLE_TRUNC_LEN]}_", v' if row[4] is not None else "V")
+                + f"ia `/{row[3]}`]({constants.SITE_URL.lower()}/{constants.USER_STATIC_HTTP_PATH}/{row[2]}) "
                 f"(c: {row[0]}, u: {row[1]})"
                 for row in page_list
             ]

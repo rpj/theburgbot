@@ -44,9 +44,15 @@ def create_buttons_view(interaction_id: str):
         ):
             interaction_id = button.custom_id.split(":")[-1]
             invite_key = await accept_invite(interaction, interaction_id)
+            inflight = INFLIGHT_INTERACTIONS[interaction_id]
+            accepted_embed = create_embed(
+                inflight["invite_for"], inflight["try_phrase_json"]
+            )
+            accepted_embed.set_footer(text=f"(ref: {invite_key})")
             await interaction.response.edit_message(
-                content=f'## Invite created for _**{INFLIGHT_INTERACTIONS[interaction_id]["invite_for"]}**_!'
-                f"\n(key: `{invite_key}`)\n\n",
+                content=f"## Invite created!"
+                f"\n\nBe sure to share or save this: it will disappear eventually!\n",
+                embeds=[accepted_embed],
                 view=None,
             )
             del INFLIGHT_INTERACTIONS[interaction_id]
@@ -76,7 +82,7 @@ def create_embed(invite_for: str, try_phrase_json: str, **kwargs):
     invite_emb = discord.Embed(title=f"{invite_for}'s invite:")
     invite_emb.url = constants.SITE_URL
     invite_emb.description = (
-        f"**{constants.SEPERATOR.join(json.loads(try_phrase_json))}**"
+        f"## {(constants.SEPERATOR + '## ').join(json.loads(try_phrase_json))}"
     )
     return invite_emb
 

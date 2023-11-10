@@ -24,7 +24,7 @@ async def query_openai(
     while not comp and retries > 0:
         try:
             comp = await openai.ChatCompletion.acreate(
-                model=model, messages=[{"role": "user", "content": query}]
+                model=model, messages=[{"role": "user", "content": query}], timeout=180
             )
         except openai.error.ServiceUnavailableError:
             retries -= 1
@@ -75,7 +75,7 @@ async def gpt_cmd_handler(
         "gpt",
         "gpt_response",
         {
-            "prompt": query,
+            "prompt": real_prompt,
             "response": mistune.html(response),
             "model": {
                 "displayName": "OpenAI completions API",
@@ -84,9 +84,10 @@ async def gpt_cmd_handler(
             },
             "captureTimestamp": datetime.datetime.now().isoformat(),
         },
+        query,
     )
 
-    msg_postfix = f"_This response is available forever at: {constants.SITE_URL.lower()}/{constants.USER_STATIC_HTTP_PATH}/{url_id} _\n\n"
+    msg_postfix = f"_This response is available forever at:_ {constants.SITE_URL.lower()}/{constants.USER_STATIC_HTTP_PATH}/{url_id}\n\n"
     f"\n### Parameters:\n* Model: **{model}**\n* Response shortened? **{'Yes' if shorten_response else 'No'}**"
 
     try:
@@ -96,7 +97,7 @@ async def gpt_cmd_handler(
         )
     except discord.errors.HTTPException:
         await interaction.followup.send(
-            f"# Prompt:\n{query_quoted}\n# Response:\n_Too large to be shown here!_ Use the URL below to view...\n\n{msg_postfix}",
+            f"# Prompt:\n{query_quoted}\n# Response:\n_... is too large to be shown here!_\nSee below for a URL to view it.\n\n\n{msg_postfix}",
             ephemeral=not public_reply,
         )
     finally:
