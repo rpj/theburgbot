@@ -146,6 +146,7 @@ class TheBurgBotDB:
                     raise Exception(
                         f"DB version mismatch! {ver_rows[-1][0]} vs. {schema_dirents[-1].name}"
                     )
+                LOGGER.info(f"Initialized DB at version {ver_rows[-1][0]}")
                 return
 
             cur_ver = ver_rows[-1][0]

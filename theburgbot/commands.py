@@ -203,7 +203,7 @@ def register_slash_commands(
 
     @client.tree.command(
         name="feedback",
-        description="Submit feedback, bug reports, suggetions, etc. about the server or the bot",
+        description="Submit feedback about the server, bug reports about the bot, feature requests, etc. etc.",
     )
     @app_commands.describe(feedback="Your feedback, freeform.")
     @audit_log_start_end_async("COMMAND_FEEDBACK", db_path=client.db_path)

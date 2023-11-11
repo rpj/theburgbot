@@ -14,10 +14,10 @@ async def command_usage_embed(
 ) -> discord.Embed:
     db = TheBurgBotDB(db_path)
     e = discord.Embed(title="Command Usage")
-    for display_name, usage_count in await db._direct_exec(
-        "select display_name, count(display_name) from cmd_use_log group by display_name"
+    for user_id, usage_count in await db._direct_exec(
+        "select user_id, count(user_id) from cmd_use_log group by user_id"
     ):
-        e.add_field(name=display_name, value=usage_count)
+        e.add_field(value=f"<@{user_id}>", name=usage_count)
     return e
 
 
