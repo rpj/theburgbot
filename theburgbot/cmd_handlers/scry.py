@@ -34,10 +34,6 @@ async def scry_lookup(
 
         def _emb_from_item_obj(item):
             emb = discord.Embed(title=item["name"])
-            if "oracle_text" in item:
-                emb.description = item["oracle_text"]
-                if "flavor_text" in item:
-                    emb.description = f"{emb.description}\n\n_{item['flavor_text']}_"
             if "scryfall_uri" in item:
                 emb.url = item["scryfall_uri"]
             emb.set_author(
@@ -47,15 +43,6 @@ async def scry_lookup(
 
             if "image_uris" in item and "png" in item["image_uris"]:
                 emb.set_image(url=item["image_uris"]["png"])
-
-            if "mana_cost" in item:
-                emb.add_field(name="Mana Cost", value=item["mana_cost"], inline=True)
-            if "type_line" in item:
-                emb.add_field(name="Type", value=item["type_line"], inline=True)
-            if "rarity" in item:
-                emb.add_field(name="Rarity", value=item["rarity"], inline=True)
-            if "set_name" in item:
-                emb.add_field(name="Set", value=item["set_name"], inline=True)
 
             if "prices" in item:
                 for name, price in [

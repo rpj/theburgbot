@@ -73,6 +73,7 @@ async def test_db_upgrade():
     except FileNotFoundError:
         assert False
 
+
 @pytest.mark.asyncio
 async def test_register_user_flux():
     db = TheBurgBotDB(TEST_DB_PATH)
