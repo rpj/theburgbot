@@ -2,6 +2,7 @@ import asyncio
 import datetime
 import logging
 import queue
+import re
 import sys
 import threading
 from dataclasses import dataclass
@@ -9,9 +10,12 @@ from dataclasses import dataclass
 import discord
 from discord.ext import commands
 
+from theburgbot import constants
 from theburgbot.cmd_handlers.igdb import igdb_refresh_token
+from theburgbot.cmd_handlers.scry import scry_lookup
 from theburgbot.config import discord_ids, reaction_roles
-from theburgbot.db import TheBurgBotDB, audit_log_start_end_async
+from theburgbot.db import (TheBurgBotDB, audit_log_start_end_async,
+                           command_create_internal_logger)
 from theburgbot.httpapi import TheBurgBotHTTP
 from theburgbot.invite_thread import invite_thread_run
 
@@ -93,7 +97,27 @@ class TheBurgBotClient(commands.Bot):
             if message.author.id == self.user.id:
                 # don't log our own messages
                 return
-            await TheBurgBotDB(self.db_path).log_message(
+            db = TheBurgBotDB(self.db_path)
+            embeds = []
+            for card_name in re.findall(constants.INLINE_SCRY_PATTERN, message.content):
+                (scry_embeds, _was_more) = await scry_lookup(
+                    message.author,
+                    card_name,
+                    exact_match=True,
+                    audit_logger=await command_create_internal_logger(
+                        self.db_path,
+                        "INLINE_SCRY_LOOKUP",
+                        {"query": card_name, "author": message.author.id},
+                    ),
+                )
+                if scry_embeds:
+                    if len(scry_embeds) > 1:
+                        LOGGER.warning(f"More than one scry result for inline lookup!")
+                    embeds.extend(scry_embeds)
+            if len(embeds) > 0:
+                await message.channel.send(embeds=embeds)
+
+            await db.log_message(
                 channel_id=message.channel.id,
                 channel_name=message.channel.name,
                 author_id=message.author.id,
@@ -149,8 +173,16 @@ class TheBurgBotClient(commands.Bot):
         return await self._on_raw_reaction__add_or_rm(payload)
 
     async def _on_member_audit(self, event, userOrMember):
+        gname = ""
+        if isinstance(userOrMember, discord.Member):
+            gname = userOrMember.global_name
+        elif isinstance(userOrMember, discord.User):
+            gname = userOrMember.display_name
+        else:
+            LOGGER.warning("What the hell is this instance?")
+            print(userOrMember)
         await TheBurgBotDB(self.db_path).register_user_flux(
-            userOrMember.id, userOrMember.name, userOrMember.global_name, event
+            userOrMember.id, userOrMember.name, gname, event
         )
         return await TheBurgBotDB(self.db_path).audit_log_event_json(
             {

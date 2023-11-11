@@ -46,7 +46,7 @@ async def scry_lookup(
 
             if "prices" in item:
                 for name, price in [
-                    (i[0], i[1])
+                    (i[0].replace("_", " "), i[1])
                     for i in item["prices"].items()
                     if i[0].startswith("usd") and i[1]
                 ]:
@@ -56,7 +56,8 @@ async def scry_lookup(
 
             if "related_uris" in item and "gatherer" in item["related_uris"]:
                 emb.add_field(
-                    name="Gatherer Link", value=item["related_uris"]["gatherer"]
+                    name="Gatherer",
+                    value=f'[{item["name"]}]({item["related_uris"]["gatherer"]})',
                 )
             return emb
 

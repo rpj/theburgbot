@@ -10,6 +10,7 @@ from typing import Any, Dict, List, Optional
 
 import aiosqlite
 import chevron
+import discord
 import nanoid
 
 from theburgbot import constants
@@ -39,6 +40,27 @@ def audit_log_start_end_async(event_name_prefix, db_path):
         return wrapped
 
     return wrapper
+
+
+async def command_use_log(db_path: str, interaction: discord.Interaction):
+    return await TheBurgBotDB(db_path).cmd_use_log(
+        interaction.command.name, interaction.user.id, interaction.user.display_name
+    )
+
+
+async def command_audit_logger(db_path: str, obj, event):
+    return await TheBurgBotDB(db_path).audit_log_event_json(obj, event=event)
+
+
+async def command_create_internal_logger(db_path: str, event_pre, pre_obj):
+    async def _int_logger(event_post, obj):
+        return await command_audit_logger(
+            db_path,
+            {**pre_obj, **obj},
+            event=f"{event_pre}__{event_post}",
+        )
+
+    return _int_logger
 
 
 class TheBurgBotDB:
@@ -140,6 +162,14 @@ class TheBurgBotDB:
             cursor = await db.execute(sql, p_tuple)
             await db.commit()
             return await cursor.fetchall()
+
+    async def add_feedback(self, author_id: str, feedback: str):
+        async with aiosqlite.connect(self.db_path) as db:
+            await db.execute(
+                "insert into feedback values (?, ?, ?)",
+                (datetime.datetime.now(), author_id, feedback),
+            )
+            await db.commit()
 
     async def register_user_flux(
         self, user_id: str, name: str, global_name: str, action: str

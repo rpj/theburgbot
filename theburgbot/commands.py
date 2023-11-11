@@ -12,7 +12,9 @@ from theburgbot.cmd_handlers.new_invite import invite_cmd_handler
 from theburgbot.cmd_handlers.scry import scry_cmd_handler
 from theburgbot.cmd_handlers.user import user_cmd_handler
 from theburgbot.config import discord_ids
-from theburgbot.db import TheBurgBotDB, audit_log_start_end_async
+from theburgbot.db import (TheBurgBotDB, audit_log_start_end_async,
+                           command_audit_logger,
+                           command_create_internal_logger, command_use_log)
 
 
 def register_slash_commands(
@@ -30,22 +32,14 @@ def register_slash_commands(
         and not word in badwords
     ]
 
-    async def command_use_log(interaction: discord.Interaction):
-        return await TheBurgBotDB(client.db_path).cmd_use_log(
-            interaction.command.name, interaction.user.id, interaction.user.display_name
-        )
+    async def _command_use_log(interaction: discord.Interaction):
+        return await command_use_log(client.db_path, interaction)
 
-    async def command_audit_logger(obj, event):
-        return await TheBurgBotDB(client.db_path).audit_log_event_json(obj, event=event)
+    async def _command_audit_logger(interaction: discord.Interaction, **kwargs):
+        return await command_audit_logger(client.db_path, interaction, **kwargs)
 
-    async def command_create_internal_logger(event_pre, pre_obj):
-        async def _int_logger(event_post, obj):
-            return await command_audit_logger(
-                {**pre_obj, **obj},
-                event=f"{event_pre}__{event_post}",
-            )
-
-        return _int_logger
+    async def _command_create_internal_logger(event_pre, pre_obj):
+        return await command_create_internal_logger(client.db_path, event_pre, pre_obj)
 
     @client.tree.command(
         name="invite",
@@ -57,9 +51,9 @@ def register_slash_commands(
     )
     @audit_log_start_end_async("COMMAND_INVITE", db_path=client.db_path)
     async def create_invite(interaction: discord.Interaction, invite_for: str):
-        await command_use_log(interaction)
+        await _command_use_log(interaction)
         return await invite_cmd_handler(
-            command_audit_logger,
+            _command_audit_logger,
             interaction,
             invite_for,
             client.db_path,
@@ -82,10 +76,10 @@ def register_slash_commands(
         public_reply: bool = False,
         exact_match: bool = True,
     ):
-        await command_use_log(interaction)
+        await _command_use_log(interaction)
         return await scry_cmd_handler(
-            command_create_internal_logger,
-            command_audit_logger,
+            _command_create_internal_logger,
+            _command_audit_logger,
             interaction,
             query,
             public_reply,
@@ -110,7 +104,7 @@ def register_slash_commands(
         shorten_response: bool = True,
         model: str = None,
     ):
-        await command_use_log(interaction)
+        await _command_use_log(interaction)
         if model is not None:
             member = client.get_guild(discord_ids.GUILD_ID).get_member(
                 interaction.user.id
@@ -121,8 +115,8 @@ def register_slash_commands(
                     ephemeral=True,
                 )
         return await gpt_cmd_handler(
-            command_create_internal_logger,
-            command_audit_logger,
+            _command_create_internal_logger,
+            _command_audit_logger,
             client.db_path,
             interaction,
             prompt,
@@ -147,10 +141,10 @@ def register_slash_commands(
         public_reply: bool = False,
         exact_match: bool = True,
     ):
-        await command_use_log(interaction)
+        await _command_use_log(interaction)
         return await idgb_cmd_handler(
-            command_create_internal_logger,
-            command_audit_logger,
+            _command_create_internal_logger,
+            _command_audit_logger,
             interaction,
             query,
             public_reply,
@@ -174,7 +168,7 @@ def register_slash_commands(
         list_invites: bool = False,
         # public_reply: bool = False,
     ):
-        await command_use_log(interaction)
+        await _command_use_log(interaction)
         return await admin_cmd_handler(
             interaction,
             client.db_path,
@@ -198,13 +192,33 @@ def register_slash_commands(
         interaction: discord.Interaction,
         list_pages: bool = False,
     ):
-        await command_use_log(interaction)
+        await _command_use_log(interaction)
         return await user_cmd_handler(
-            command_create_internal_logger,
-            command_audit_logger,
+            _command_create_internal_logger,
+            _command_audit_logger,
             client.db_path,
             interaction,
             list_pages,
+        )
+
+    @client.tree.command(
+        name="feedback",
+        description="Submit feedback, bug reports, suggetions, etc. about the server or the bot",
+    )
+    @app_commands.describe(feedback="Your feedback, freeform.")
+    @audit_log_start_end_async("COMMAND_FEEDBACK", db_path=client.db_path)
+    async def feedback(
+        interaction: discord.Interaction,
+        feedback: str,
+    ):
+        await _command_use_log(interaction)
+        await TheBurgBotDB(client.db_path).add_feedback(interaction.user.id, feedback)
+        await interaction.response.send_message(
+            "Thank you very much for the feedback! If a resolution is required, we'll get back to you with information about it once complete.",
+            ephemeral=True,
+        )
+        await client.get_channel(discord_ids.ADMINS_CHANNEL_ID).send(
+            f"Feedback submitted by <@{interaction.user.id}>:\n> {feedback}\n"
         )
 
     # return for register_slash_commands
