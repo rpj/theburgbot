@@ -22,6 +22,12 @@ If you change or update slash command definitions and want them to be reflected 
 
 ## Development
 
+### Test
+
+```shell
+poetry run pytest tests/
+```
+
 ### Lint
 
 ```shell
