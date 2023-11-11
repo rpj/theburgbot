@@ -4,8 +4,10 @@ from typing import List
 
 import discord
 import nanoid
+from discord import app_commands
 
 from theburgbot import constants
+from theburgbot.common import CommandHandler
 from theburgbot.db import TheBurgBotDB
 
 # todo: store in DB so that bot crash doesn't wipe these out?
@@ -147,3 +149,35 @@ async def invite_cmd_handler(
         },
         event="COMMAND_INVITE",
     )
+
+
+class TheBurgBotUserCommand(CommandHandler):
+    def register_command(
+        self,
+        client: "TheBurgBotClient",
+        audit_log_decorator,
+        command_use_logger,
+        command_create_internal_logger,
+        command_audit_logger,
+        filtered_words,
+    ):
+        @client.tree.command(
+            name="invite",
+            description="Create a one-time-use invite code. "
+            "The response will be shown only to you.",
+        )
+        @app_commands.describe(
+            invite_for="Who this invite is for (Discord user or real name)"
+        )
+        @audit_log_decorator("COMMAND_INVITE", db_path=client.db_path)
+        async def create_invite(interaction: discord.Interaction, invite_for: str):
+            await command_use_logger(interaction)
+            return await invite_cmd_handler(
+                command_audit_logger,
+                interaction,
+                invite_for,
+                client.db_path,
+                filtered_words,
+            )
+
+        return "invite"

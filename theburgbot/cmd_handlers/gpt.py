@@ -5,8 +5,11 @@ import logging
 import discord
 import mistune
 import openai
+from discord import app_commands
 
 from theburgbot import constants
+from theburgbot.common import CommandHandler
+from theburgbot.config import discord_ids
 from theburgbot.db import TheBurgBotDB
 
 LOGGER = logging.getLogger("discord")
@@ -105,3 +108,55 @@ async def gpt_cmd_handler(
             {**audit_obj, "url_id": url_id},
             event="COMMAND_GPT",
         )
+
+
+class TheBurgBotUserCommand(CommandHandler):
+    def register_command(
+        self,
+        client: "TheBurgBotClient",
+        audit_log_decorator,
+        command_use_logger,
+        command_create_internal_logger,
+        command_audit_logger,
+        filtered_words,
+    ):
+        @client.tree.command(
+            name="gpt",
+            description="Talk to ChatGPT. Please use sparingly: it isn't free!",
+        )
+        @app_commands.describe(
+            prompt="What to ask of ChatGPT",
+            public_reply="Send the reply to the channel (defaults to False)",
+            shorten_response="Append instruction to the prompt to keep the response short",
+            model="The model to use (only available to Admins)",
+        )
+        @audit_log_decorator("COMMAND_GPT", db_path=client.db_path)
+        async def gpt(
+            interaction: discord.Interaction,
+            prompt: str,
+            public_reply: bool = False,
+            shorten_response: bool = True,
+            model: str = None,
+        ):
+            await command_use_logger(interaction)
+            if model is not None:
+                member = client.get_guild(discord_ids.GUILD_ID).get_member(
+                    interaction.user.id
+                )
+                if member.get_role(discord_ids.ADMINS_ROLE_ID) is None:
+                    return await interaction.response.send_message(
+                        "You do not have permission to use the `model` option. Please remove it and try again.",
+                        ephemeral=True,
+                    )
+            return await gpt_cmd_handler(
+                command_create_internal_logger,
+                command_audit_logger,
+                client.db_path,
+                interaction,
+                prompt,
+                public_reply,
+                shorten_response,
+                model,
+            )
+
+        return "gpt"

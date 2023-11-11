@@ -1,12 +1,13 @@
 import datetime
 import functools
+import hashlib
 import json
 import logging
 import os
 import shutil
 import sys
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional
 
 import aiosqlite
 import chevron
@@ -364,3 +365,116 @@ class TheBurgBotDB:
             )
             await db.commit()
             return await cursor.fetchall()
+
+    async def get_event_snowflake_if_exists(
+        self, event: Dict[str, Any]
+    ) -> Optional[str]:
+        async with aiosqlite.connect(self.db_path) as db:
+            event_json = json.dumps(event)
+            event_json_digest = hashlib.sha256(event_json.encode("utf-8")).hexdigest()
+            async with db.execute(
+                "select snowflake from events where json_digest = ?",
+                (event_json_digest,),
+            ) as cursor:
+                rows = await cursor.fetchall()
+                if not len(rows) == 1:
+                    return None
+                return rows[0][0]
+
+    async def event_exists_by_snowflake(self, db, snowflake: str) -> bool:
+        async with db.execute(
+            "select * from events where snowflake = ?", (snowflake,)
+        ) as cursor:
+            rows = await cursor.fetchall()
+            return len(rows) == 1
+
+    async def event_has_changed(self, snowflake: str, event: Dict[str, Any]) -> bool:
+        event_json = json.dumps(event)
+        event_json_digest = hashlib.sha256(event_json.encode("utf-8")).hexdigest()
+        async with aiosqlite.connect(self.db_path) as db:
+            async with await db.execute(
+                "select json_digest from events where snowflake = ?", (snowflake,)
+            ) as cursor:
+                rows = await cursor.fetchall()
+                if len(rows) != 1:
+                    return False
+                return event_json_digest != rows[0][0]
+
+    async def add_event(self, snowflake: str, event: Dict[str, Any]) -> str:
+        async with aiosqlite.connect(self.db_path) as db:
+            if await self.event_exists_by_snowflake(db, snowflake):
+                print(f"NOT ADDING {snowflake}: it already exists")
+                if await self.event_has_changed(snowflake, event):
+                    print(f"MUST UPDATE! {event}")
+                return
+
+            event_json = json.dumps(event)
+            event_json_digest = hashlib.sha256(event_json.encode("utf-8")).hexdigest()
+            await db.execute(
+                "insert into events values (?, ?, ?, ?)",
+                (
+                    datetime.datetime.now(),
+                    snowflake,
+                    event_json_digest,
+                    event_json,
+                ),
+            )
+            await db.commit()
+            if db.total_changes != 1:
+                raise BaseException()
+            return event_json_digest
+
+
+class TheBurgBotKVStore(TheBurgBotDB):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+    async def set(self, key: str, value: str) -> None:
+        async with aiosqlite.connect(self.db_path) as db:
+            await db.execute(
+                "insert into kv_store values (?, ?, ?) "
+                "on conflict (user_key) do update set user_value = excluded.user_value",
+                (
+                    datetime.datetime.now(),
+                    key,
+                    value,
+                ),
+            )
+            await db.commit()
+
+    async def get(self, key: str) -> Optional[str]:
+        async with aiosqlite.connect(self.db_path) as db:
+            cursor = await db.execute(
+                "select user_value from kv_store where user_key = ?", (key,)
+            )
+            await db.commit()
+            rows = await cursor.fetchall()
+            return None if len(rows) == 0 else rows[0][0]
+
+
+class TheBurgBotKeyedJSONStore(TheBurgBotKVStore):
+    def __init__(self, *args, namespace: Optional[str] = None, **kwargs):
+        self.namespace = namespace
+        super().__init__(*args, **kwargs)
+
+    def _ns_key(self, key: str) -> str:
+        if self.namespace:
+            return f"//{self.namespace}/{key}"
+        return key
+
+    async def set(self, key: str, value: Any) -> None:
+        return await super().set(self._ns_key(key), json.dumps(value))
+
+    async def setnx(self, key: str, value: Any) -> None:
+        if await self.get(key) is None:
+            return await super().set(self._ns_key(key), json.dumps(value))
+
+    async def get(
+        self, key: str, *, default_producer: Optional[Callable[[], Any]] = None
+    ) -> Optional[Any]:
+        db_val = await super().get(self._ns_key(key))
+        return (
+            json.loads(db_val)
+            if db_val
+            else (default_producer() if default_producer else None)
+        )

@@ -4,7 +4,7 @@ from pathlib import Path
 import pytest
 
 from theburgbot import constants
-from theburgbot.db import TheBurgBotDB
+from theburgbot.db import TheBurgBotDB, TheBurgBotKeyedJSONStore
 
 TEST_DB_PATH = Path(__file__).resolve().parent / "__test__.sqlite3"
 APPENDED_SCHEMAS = []
@@ -86,3 +86,54 @@ async def test_register_user_flux():
     assert name == "foo"
     assert gname == "FooBar"
     assert action == "TEST_ACTION"
+
+
+@pytest.mark.asyncio
+async def test_json_kv_store():
+    json_kv = TheBurgBotKeyedJSONStore(TEST_DB_PATH)
+    await json_kv.initialize()
+    assert await json_kv.get("foo") == None
+    await json_kv.set("foo", {"bar": 42, "baz": False})
+    assert await json_kv.get("foo") == {"bar": 42, "baz": False}
+    await json_kv.set("foo", [1, "two", 33, 42, False, None, -3.14159])
+    assert await json_kv.get("foo") == [1, "two", 33, 42, False, None, -3.14159]
+    await json_kv.set("fooBar", await json_kv.get("foo"))
+    assert await json_kv.get("foo") == await json_kv.get("fooBar")
+
+    json_kv_foobarns = TheBurgBotKeyedJSONStore(TEST_DB_PATH, namespace="foobar")
+    assert await json_kv_foobarns.get("foo") == None
+    await json_kv_foobarns.set("foo", {"bar": 42, "baz": False})
+    assert await json_kv_foobarns.get("foo") == {"bar": 42, "baz": False}
+    await json_kv_foobarns.set("foo", [1, "two", 33, 42, False, None, -3.14159])
+    assert await json_kv_foobarns.get("foo") == [
+        1,
+        "two",
+        33,
+        42,
+        False,
+        None,
+        -3.14159,
+    ]
+    await json_kv_foobarns.set("fooBar", await json_kv_foobarns.get("foo"))
+    assert await json_kv_foobarns.get("foo") == await json_kv_foobarns.get("fooBar")
+
+    assert await json_kv.get("//foobar/foo") == [
+        1,
+        "two",
+        33,
+        42,
+        False,
+        None,
+        -3.14159,
+    ]
+    assert await json_kv.get("//foobar/fooBar") == await json_kv.get("//foobar/foo")
+
+
+@pytest.mark.asyncio
+async def test_json_kv_store_setnx():
+    json_kv = TheBurgBotKeyedJSONStore(TEST_DB_PATH)
+    await json_kv.initialize()
+    await json_kv.set("test-setnx", 42)
+    assert await json_kv.get("test-setnx") == 42
+    await json_kv.setnx("test-setnx", 43)
+    assert await json_kv.get("test-setnx") == 42

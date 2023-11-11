@@ -13,13 +13,17 @@ from discord.ext import commands
 from theburgbot import constants
 from theburgbot.cmd_handlers.igdb import igdb_refresh_token
 from theburgbot.cmd_handlers.scry import scry_lookup
+from theburgbot.common import strip_html
 from theburgbot.config import discord_ids, reaction_roles
 from theburgbot.db import (TheBurgBotDB, audit_log_start_end_async,
                            command_create_internal_logger)
 from theburgbot.httpapi import TheBurgBotHTTP
+from theburgbot.ical import iCalSyncer
 from theburgbot.invite_thread import invite_thread_run
 
 LOGGER = logging.getLogger("discord")
+
+from theburgbot.common import dprint as print
 
 
 class TheBurgBotClient(commands.Bot):
@@ -40,6 +44,9 @@ class TheBurgBotClient(commands.Bot):
         )
         self.invite_req_queue = queue.Queue()
         self.initialized = False
+        self.ical_syncer = iCalSyncer(
+            filter_strings=["Prerelease"], db_path=self.db_path
+        )
 
     async def on_ready(self):
         if self.initialized:
@@ -88,6 +95,50 @@ class TheBurgBotClient(commands.Bot):
                 event=f"IGDB_TOKEN_REFRESH__{ev_extra}",
             ),
         )
+
+        async def ical_bot_synced_callback(current_events):
+            tz = datetime.timezone(offset=datetime.timedelta(hours=-8))
+            guild: discord.Guild = self.get_guild(discord_ids.GUILD_ID)
+            db = TheBurgBotDB(self.db_path)
+            for event in current_events:
+                print(event)
+                ev_for_json = {**event}
+                del ev_for_json["start_time"]  # XXX fix
+                for k in ["end_time"]:  # ["start_time", "end_time"]:
+                    ev_for_json[k] = ev_for_json[k].timestamp()
+                print(f"Checking event: {ev_for_json}")
+
+                # only adjust `event` AFTER getting the JSON obj; that's what we ALWAYS hash
+                event["description"] = strip_html(event["description"])
+                if event["start_time"] <= datetime.datetime.now(tz=tz):
+                    event["start_time"] = datetime.datetime.now(
+                        tz=tz
+                    ) + datetime.timedelta(hours=12)
+
+                extant_event_snowflake = await db.get_event_snowflake_if_exists(
+                    ev_for_json
+                )
+                if extant_event_snowflake:
+                    print("UPDATE?")
+                    print(
+                        await db.event_has_changed(extant_event_snowflake, ev_for_json)
+                    )
+                else:
+                    new_event_snowflake = await guild.create_scheduled_event(
+                        **{
+                            **event,
+                            "entity_type": discord.EntityType.external,
+                            "privacy_level": discord.PrivacyLevel.guild_only,
+                        }
+                    )
+                    print(f"new_event_snowflake={new_event_snowflake.id}")
+                    digest = await db.add_event(
+                        str(new_event_snowflake.id), ev_for_json
+                    )
+                    print(f"digest={digest}")
+
+        await self.ical_syncer.start_sync(ical_bot_synced_callback)
+
         self.initialized = True
         LOGGER.info("✅ TheBurgBot is ready")
 

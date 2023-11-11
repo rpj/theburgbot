@@ -5,6 +5,9 @@ from typing import List
 
 import discord
 import httpx
+from discord import app_commands
+
+from theburgbot.common import CommandHandler
 
 SCRYFALL_URL = "https://api.scryfall.com"
 
@@ -108,3 +111,42 @@ async def scry_cmd_handler(
         },
         event="COMMAND_SCRY",
     )
+
+
+class TheBurgBotUserCommand(CommandHandler):
+    def register_command(
+        self,
+        client: "TheBurgBotClient",
+        audit_log_decorator,
+        command_use_logger,
+        command_create_internal_logger,
+        command_audit_logger,
+        filtered_words,
+    ):
+        @client.tree.command(
+            name="scry",
+            description="Lookup Magic: The Gathering card info on scryfall.com",
+        )
+        @app_commands.describe(
+            query="The search string",
+            public_reply="Send the reply to the channel (defaults to False)",
+            exact_match="Return exact matches only (defaults to True)",
+        )
+        @audit_log_decorator("COMMAND_SCRY", db_path=client.db_path)
+        async def scryfall(
+            interaction: discord.Interaction,
+            query: str,
+            public_reply: bool = False,
+            exact_match: bool = True,
+        ):
+            await command_use_logger(interaction)
+            return await scry_cmd_handler(
+                command_create_internal_logger,
+                command_audit_logger,
+                interaction,
+                query,
+                public_reply,
+                exact_match,
+            )
+
+        return "scry"

@@ -8,6 +8,9 @@ from typing import List, Optional
 
 import discord
 import httpx
+from discord import app_commands
+
+from theburgbot.common import CommandHandler
 
 LOGGER = logging.getLogger("discord")
 IGDB_URL = "https://api.igdb.com/v4"
@@ -203,3 +206,42 @@ async def idgb_cmd_handler(
         audit_obj,
         event="COMMAND_IGDB",
     )
+
+
+class TheBurgBotUserCommand(CommandHandler):
+    def register_command(
+        self,
+        client: "TheBurgBotClient",
+        audit_log_decorator,
+        command_use_logger,
+        command_create_internal_logger,
+        command_audit_logger,
+        filtered_words,
+    ):
+        @client.tree.command(
+            name="igdb",
+            description="Lookup video games on igdb.com",
+        )
+        @app_commands.describe(
+            query="The search string",
+            public_reply="Send the reply to the channel (defaults to False)",
+            exact_match="Return exact matches only (defaults to True)",
+        )
+        @audit_log_decorator("COMMAND_IGDB", db_path=client.db_path)
+        async def igdb(
+            interaction: discord.Interaction,
+            query: str,
+            public_reply: bool = False,
+            exact_match: bool = True,
+        ):
+            await command_use_logger(interaction)
+            return await idgb_cmd_handler(
+                command_create_internal_logger,
+                command_audit_logger,
+                interaction,
+                query,
+                public_reply,
+                exact_match,
+            )
+
+        return "igdb"

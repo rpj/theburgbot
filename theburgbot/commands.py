@@ -1,19 +1,15 @@
+import importlib
+from pathlib import Path
+
 import discord
 import nltk
 import requests
-from discord import app_commands
 
 from theburgbot import constants
 from theburgbot.client import TheBurgBotClient
-from theburgbot.cmd_handlers.admin import admin_cmd_handler
-from theburgbot.cmd_handlers.gpt import gpt_cmd_handler
-from theburgbot.cmd_handlers.igdb import idgb_cmd_handler
-from theburgbot.cmd_handlers.new_invite import invite_cmd_handler
-from theburgbot.cmd_handlers.scry import scry_cmd_handler
-from theburgbot.cmd_handlers.user import user_cmd_handler
-from theburgbot.config import discord_ids
-from theburgbot.db import (TheBurgBotDB, audit_log_start_end_async,
-                           command_audit_logger,
+from theburgbot.common import CommandHandler
+from theburgbot.common import dprint as print
+from theburgbot.db import (audit_log_start_end_async, command_audit_logger,
                            command_create_internal_logger, command_use_log)
 
 
@@ -41,185 +37,31 @@ def register_slash_commands(
     async def _command_create_internal_logger(event_pre, pre_obj):
         return await command_create_internal_logger(client.db_path, event_pre, pre_obj)
 
-    @client.tree.command(
-        name="invite",
-        description="Create a one-time-use invite code. "
-        "The response will be shown only to you.",
-    )
-    @app_commands.describe(
-        invite_for="Who this invite is for (Discord user or real name)"
-    )
-    @audit_log_start_end_async("COMMAND_INVITE", db_path=client.db_path)
-    async def create_invite(interaction: discord.Interaction, invite_for: str):
-        await _command_use_log(interaction)
-        return await invite_cmd_handler(
-            _command_audit_logger,
-            interaction,
-            invite_for,
-            client.db_path,
-            filtered_words,
-        )
-
-    @client.tree.command(
-        name="scry",
-        description="Lookup Magic: The Gathering card info on scryfall.com",
-    )
-    @app_commands.describe(
-        query="The search string",
-        public_reply="Send the reply to the channel (defaults to False)",
-        exact_match="Return exact matches only (defaults to True)",
-    )
-    @audit_log_start_end_async("COMMAND_SCRY", db_path=client.db_path)
-    async def scryfall(
-        interaction: discord.Interaction,
-        query: str,
-        public_reply: bool = False,
-        exact_match: bool = True,
-    ):
-        await _command_use_log(interaction)
-        return await scry_cmd_handler(
-            _command_create_internal_logger,
-            _command_audit_logger,
-            interaction,
-            query,
-            public_reply,
-            exact_match,
-        )
-
-    @client.tree.command(
-        name="gpt",
-        description="Talk to ChatGPT. Please use sparingly: it isn't free!",
-    )
-    @app_commands.describe(
-        prompt="What to ask of ChatGPT",
-        public_reply="Send the reply to the channel (defaults to False)",
-        shorten_response="Append instruction to the prompt to keep the response short",
-        model="The model to use (only available to Admins)",
-    )
-    @audit_log_start_end_async("COMMAND_GPT", db_path=client.db_path)
-    async def gpt(
-        interaction: discord.Interaction,
-        prompt: str,
-        public_reply: bool = False,
-        shorten_response: bool = True,
-        model: str = None,
-    ):
-        await _command_use_log(interaction)
-        if model is not None:
-            member = client.get_guild(discord_ids.GUILD_ID).get_member(
-                interaction.user.id
-            )
-            if member.get_role(discord_ids.ADMINS_ROLE_ID) is None:
-                return await interaction.response.send_message(
-                    "You do not have permission to use the `model` option. Please remove it and try again.",
-                    ephemeral=True,
+    expect_protocol_methods = [x for x in dir(CommandHandler) if not x.startswith("_")]
+    cmd_handlers_path = Path(__file__).parent / "cmd_handlers"
+    for ch_py_file in cmd_handlers_path.glob("*.py"):
+        import_name = f"theburgbot.cmd_handlers.{ch_py_file.stem}"
+        mod = importlib.import_module(import_name)
+        mod_symbols = dir(mod)
+        if "TheBurgBotUserCommand" in mod_symbols:
+            tbbuc: CommandHandler = getattr(mod, "TheBurgBotUserCommand")
+            if all(
+                [
+                    x in expect_protocol_methods
+                    for x in dir(tbbuc)
+                    if not x.startswith("_")
+                ]
+            ):
+                cmd_instance = tbbuc()
+                cmd_name = cmd_instance.register_command(
+                    client,
+                    audit_log_start_end_async,
+                    _command_use_log,
+                    _command_create_internal_logger,
+                    _command_audit_logger,
+                    filtered_words,
                 )
-        return await gpt_cmd_handler(
-            _command_create_internal_logger,
-            _command_audit_logger,
-            client.db_path,
-            interaction,
-            prompt,
-            public_reply,
-            shorten_response,
-            model,
-        )
-
-    @client.tree.command(
-        name="igdb",
-        description="Lookup video games on igdb.com",
-    )
-    @app_commands.describe(
-        query="The search string",
-        public_reply="Send the reply to the channel (defaults to False)",
-        exact_match="Return exact matches only (defaults to True)",
-    )
-    @audit_log_start_end_async("COMMAND_IGDB", db_path=client.db_path)
-    async def igdb(
-        interaction: discord.Interaction,
-        query: str,
-        public_reply: bool = False,
-        exact_match: bool = True,
-    ):
-        await _command_use_log(interaction)
-        return await idgb_cmd_handler(
-            _command_create_internal_logger,
-            _command_audit_logger,
-            interaction,
-            query,
-            public_reply,
-            exact_match,
-        )
-
-    @client.tree.command(
-        name="admin",
-    )
-    @app_commands.describe(
-        command_usage="Include the command usage statistics embed. Can be sent publicly.",
-        discord_ids="Include the relevant DiscordIDs embed. Can **not** be sent publicly.",
-        list_invites="List all invites and their metadata.",
-        # public_reply="Send the reply to the channel (defaults to False)",
-    )
-    @audit_log_start_end_async("COMMAND_ADMIN", db_path=client.db_path)
-    async def admin(
-        interaction: discord.Interaction,
-        command_usage: bool = False,
-        discord_ids: bool = False,
-        list_invites: bool = False,
-        # public_reply: bool = False,
-    ):
-        await _command_use_log(interaction)
-        return await admin_cmd_handler(
-            interaction,
-            client.db_path,
-            **{
-                "command_usage": command_usage,
-                "discord_ids": discord_ids,
-                "list_invites": list_invites,
-                # "public_reply": public_reply,
-            },
-        )
-
-    @client.tree.command(
-        name="user",
-        description="Commands related to actions you've performed with the bot",
-    )
-    @app_commands.describe(
-        list_pages="Lists all the pages the bot has created on your behalf"
-    )
-    @audit_log_start_end_async("COMMAND_USER", db_path=client.db_path)
-    async def user(
-        interaction: discord.Interaction,
-        list_pages: bool = False,
-    ):
-        await _command_use_log(interaction)
-        return await user_cmd_handler(
-            _command_create_internal_logger,
-            _command_audit_logger,
-            client.db_path,
-            interaction,
-            list_pages,
-        )
-
-    @client.tree.command(
-        name="feedback",
-        description="Submit feedback about the server, bug reports about the bot, feature requests, etc. etc.",
-    )
-    @app_commands.describe(feedback="Your feedback, freeform.")
-    @audit_log_start_end_async("COMMAND_FEEDBACK", db_path=client.db_path)
-    async def feedback(
-        interaction: discord.Interaction,
-        feedback: str,
-    ):
-        await _command_use_log(interaction)
-        await TheBurgBotDB(client.db_path).add_feedback(interaction.user.id, feedback)
-        await interaction.response.send_message(
-            "Thank you very much for the feedback! If a resolution is required, we'll get back to you with information about it once complete.",
-            ephemeral=True,
-        )
-        await client.get_channel(discord_ids.ADMINS_CHANNEL_ID).send(
-            f"Feedback submitted by <@{interaction.user.id}>:\n> {feedback}\n"
-        )
+                print(f"Registered user command /{cmd_name}")
 
     # return for register_slash_commands
     return client
