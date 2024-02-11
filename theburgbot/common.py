@@ -98,6 +98,8 @@ async def http_get_cached(
 
         if mod_dt.timestamp() + (ttl_hours * 60 * 60) < now_ts:
             await _refresh()
+        else:
+            dprint(f"USING CACHED {cache_path}")
     else:
         await _refresh()
 
