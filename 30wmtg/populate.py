@@ -10,8 +10,10 @@ async def main():
     if sets["has_more"]:
         print("HAS_MORE! not implemented...")
         return
-    
-    print(len(sets))
+
+    sets_data = sets["data"]
+    cards_count = sum([set_dict["card_count"] for set_dict in sets_data])
+    print(f"{cards_count} across {len(sets_data)} sets")
 
 
 if __name__ == "__main__":
