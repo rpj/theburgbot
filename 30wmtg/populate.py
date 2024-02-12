@@ -1,19 +1,15 @@
 import asyncio
 
 from theburgbot.common import dprint as print
-from theburgbot.common import dt_to_date, http_get_cached, http_get_cached_json
+from theburgbot.common import http_get_path_cached_checksummed
 from theburgbot.ical import MTG_SETS_URL
 
+MTGJSON_SQLITE_CHECKSUM_URL = "https://mtgjson.com/api/v5/AllPrintings.sqlite.bz2.sha256"
+MTGJSON_SQLITE_ASSET_URL = "https://mtgjson.com/api/v5/AllPrintings.sqlite.bz2"
 
 async def main():
-    sets = await http_get_cached_json(MTG_SETS_URL)
-    if sets["has_more"]:
-        print("HAS_MORE! not implemented...")
-        return
-
-    sets_data = sets["data"]
-    cards_count = sum([set_dict["card_count"] for set_dict in sets_data])
-    print(f"{cards_count} across {len(sets_data)} sets")
+    asset_path = await http_get_path_cached_checksummed(MTGJSON_SQLITE_ASSET_URL, MTGJSON_SQLITE_CHECKSUM_URL)
+    print(asset_path)
 
 
 if __name__ == "__main__":

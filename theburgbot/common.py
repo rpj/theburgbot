@@ -4,7 +4,7 @@ import json
 from functools import reduce
 from html.parser import HTMLParser
 from pathlib import Path
-from typing import Any, Protocol, Union
+from typing import Any, Optional, Protocol, Union
 
 import httpx
 import rich
@@ -72,6 +72,52 @@ def dprint(print_str, *args, **kwargs):
     )
 
 
+async def http_get_path_cached_checksummed(asset_url: str, checksum_url: str) -> Path:
+    async with httpx.AsyncClient() as client:
+
+        async def _get_current_checksum():
+            cs_res = await client.get(checksum_url)
+            if cs_res.status_code != 200:
+                raise Exception(
+                    f"http_get_checksummed checksum {checksum_url}: {cs_res.status_code}"
+                )
+            return cs_res.text
+
+        comb_shasum = hashlib.sha224(
+            asset_url.encode("utf-8") + checksum_url.encode("utf-8")
+        ).hexdigest()
+        parent = Path(__file__).resolve().parent
+        combsum_file = parent / f".checksum.{comb_shasum}"
+        asset_file = parent / f".{comb_shasum}"
+
+        async def _asset_needs_refresh() -> Optional[str]:
+            """
+            returning 'None' means: refresh not needed
+            otherwise it's the fetched checksum of the new asset
+            """
+            fetched_checksum = await _get_current_checksum()
+            if asset_file.exists() and combsum_file.exists():
+                with open(combsum_file, "r") as cs_f:
+                    current_checksum = cs_f.read()
+                    if fetched_checksum == current_checksum:
+                        return None
+            return fetched_checksum
+
+        nr_checksum = await _asset_needs_refresh()
+        if nr_checksum:
+            print(f"FETCH ASSET! {nr_checksum}")
+            with open(combsum_file, "w+") as cs_w:
+                cs_w.write(nr_checksum)
+
+            with open(asset_file, "wb+") as as_w:
+                print("FETCH ASSET")
+                async with client.stream("GET", asset_url) as stream:
+                    async for chunk in stream.aiter_bytes():
+                        as_w.write(chunk)
+
+        return asset_file
+
+
 async def http_get_cached(
     url: str, *, ttl_hours: int = 24, reader=None, writer=None, ext: str = ""
 ):
@@ -88,7 +134,7 @@ async def http_get_cached(
         async with httpx.AsyncClient() as client:
             res = await client.get(url)
             if res.status_code != 200:
-                raise Exception(f"http_get_cached {url} ({url_224})")
+                raise Exception(f"http_get_cached {url} ({url_224}): {res.status_code}")
             with open(cache_path, "w+") as f:
                 writer(f, res)
 
