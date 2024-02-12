@@ -5,16 +5,23 @@
         style="margin: 1em; padding: 1em; border: 1px solid rgb(85, 45, 45); border-radius: 0.2em; background-color: rgb(220, 223, 255)">
         {{{ text }}}
     </div>
-    <div>Set: {{ setCode }}</div>
-
-    {{#TMPL_legal}}
-    <div class="legal" style="color: green;">Legal</div>
-    {{/TMPL_legal}}
-    {{^TMPL_legal}}
-    <div style="color:red">
-        <h3>Illegal</h3>
+    <div>Set: <b>{{ setCode }}</b></div>
+    <div>
+        Links: 
+        <a href="{{{ tcgplayer }}}" target="_blank">TCGPlayer</a>,
+        <a href="{{{ cardKingdom }}}" target="_blank">CardKingdom</a>
     </div>
-    {{/TMPL_legal}}
+
+    <h3><i>Twenty Words</i> ruling</h3>
 
     <div>Number of words: {{ num_words }}</div>
+    
+    <h3>
+    {{#TMPL_legal}}
+    <span class="legal" style="color: green;">Legal</span>
+    {{/TMPL_legal}}
+    {{^TMPL_legal}}
+    <span style="color: red; font-variant: small-caps;">Illegal</span>
+    {{/TMPL_legal}}
+    </h3>
 </div>

@@ -14,22 +14,19 @@ LOGGER = logging.getLogger("discord")
 
 
 async def twentywordmagic_cards(req: web.Request):
-    print(req.match_info["card_name"])
     db_path = await mtgjson_sqlite_path()
-    print(db_path)
+
     async with aiosqlite.connect(db_path) as db:
         db.row_factory = aiosqlite.Row
         records = await db.execute_fetchall(
             "select * from cards left join twentyword_cards as tw "
-            + "where cards.uuid = tw.card_uuid and cards.name like ?",
+            + "left join cardPurchaseUrls as urls "
+            + "where cards.uuid = tw.card_uuid and cards.uuid = urls.uuid and cards.name like ?",
             (req.match_info["card_name"],),
         )
         await db.commit()
-        print(records[0])
-        print(records[0].keys())
-        print(records[0]["text"])
 
-        html_out = ""
+        html_out = "<hr>"
         frag_str = None
         with open("templates/twmtg_card_frag.html", "r") as frag:
             frag_str = frag.read()
@@ -38,10 +35,10 @@ async def twentywordmagic_cards(req: web.Request):
             row_copy["text"] = row_copy["text"].replace("\\n", "<br/>")
             if row_copy["legal"]:
                 row_copy["TMPL_legal"] = [True]
-            print(row_copy)
+            #print(row_copy)
             html_out += chevron.render(frag_str, row_copy)
+            html_out += "<hr>"
 
-        print(html_out)
         return web.Response(text=html_out, content_type="text/html")
 
 
