@@ -99,21 +99,16 @@ async def http_get_path_cached_checksummed(asset_url: str, checksum_url: str) ->
             if asset_file.exists() and combsum_file.exists():
                 with open(combsum_file, "r") as cs_f:
                     current_checksum = cs_f.read()
-                    print(
-                        f"{fetched_checksum} vs {current_checksum}: {fetched_checksum == current_checksum}"
-                    )
                     if fetched_checksum == current_checksum:
                         return None
             return fetched_checksum
 
         nr_checksum = await _asset_needs_refresh()
         if nr_checksum:
-            print(f"FETCH ASSET! {nr_checksum}")
             with open(combsum_file, "w+") as cs_w:
                 cs_w.write(nr_checksum)
 
             with open(asset_file, "wb+") as as_w:
-                print("FETCH ASSET")
                 async with client.stream("GET", asset_url) as stream:
                     async for chunk in stream.aiter_bytes():
                         as_w.write(chunk)
