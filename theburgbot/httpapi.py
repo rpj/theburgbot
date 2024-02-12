@@ -15,7 +15,6 @@ LOGGER = logging.getLogger("discord")
 
 async def twentywordmagic_cards(req: web.Request):
     db_path = await mtgjson_sqlite_path()
-
     async with aiosqlite.connect(db_path) as db:
         db.row_factory = aiosqlite.Row
         records = await db.execute_fetchall(
@@ -35,7 +34,7 @@ async def twentywordmagic_cards(req: web.Request):
             row_copy["text"] = row_copy["text"].replace("\\n", "<br/>")
             if row_copy["legal"]:
                 row_copy["TMPL_legal"] = [True]
-            #print(row_copy)
+            # print(row_copy)
             html_out += chevron.render(frag_str, row_copy)
             html_out += "<hr>"
 
@@ -77,6 +76,13 @@ class TheBurgBotHTTP:
     async def shutdown(self):
         await self.app.shutdown()
         await self.app.cleanup()
+
+    async def twmtg_cards(self, req):
+        @audit_log_start_end_async("TWMTG_CARDS_GET", db_path=self.parent.db_path)
+        async def _inner():
+            return await twentywordmagic_cards(req)
+
+        return await _inner()
 
     async def get_static_route_handler(self, req: web.Request):
         @audit_log_start_end_async(
