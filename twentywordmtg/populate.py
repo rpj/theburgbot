@@ -9,7 +9,7 @@ from alive_progress import alive_bar
 from theburgbot.common import dprint as print
 from theburgbot.common import http_get_path_cached_checksummed
 
-THIRTY = 20
+TWENTY = 20
 
 MTGJSON_SQLITE_CHECKSUM_URL = (
     "https://mtgjson.com/api/v5/AllPrintings.sqlite.bz2.sha256"
@@ -36,7 +36,7 @@ async def main():
     async with aiosqlite.connect(asset_uncompressed) as db:
         await db.execute(
             (
-                "create table if not exists thirtyword_cards ("
+                "create table if not exists twentyword_cards ("
                 "card_uuid VARCHAR(36) NOT NULL,"
                 "legal BOOLEAN NOT NULL,"
                 "num_words INTEGER NOT NULL"
@@ -59,19 +59,21 @@ async def main():
                         r"\s+", " ", re.sub(r"\([^\)]+\)", "", text).strip()
                     )
                     num_words = len(text_rm_reminder_text.split(" "))
-                    legal = num_words <= THIRTY
+                    legal = num_words <= TWENTY
                     await db.execute(
-                        "insert into thirtyword_cards values (?, ?, ?)",
+                        "insert into twentyword_cards values (?, ?, ?)",
                         (uuid, legal, num_words),
                     )
                     await db.commit()
                 bar()
 
         [(legal_count,)] = await db.execute_fetchall(
-            "select count(*) from cards left join thirtyword_cards where cards.uuid = thirtyword_cards.card_uuid and thirtyword_cards.legal = 1"
+            "select count(*) from cards left join twentyword_cards "
+            + "where cards.uuid = twentyword_cards.card_uuid and twentyword_cards.legal = 1"
         )
         [(illegal_count,)] = await db.execute_fetchall(
-            "select count(*) from cards left join thirtyword_cards where cards.uuid = thirtyword_cards.card_uuid and thirtyword_cards.legal = 0"
+            "select count(*) from cards left join twentyword_cards "
+            + "where cards.uuid = twentyword_cards.card_uuid and twentyword_cards.legal = 0"
         )
         print(f"{legal_count} legal, {illegal_count} illegal")
 
