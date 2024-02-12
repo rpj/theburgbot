@@ -99,7 +99,9 @@ async def http_get_path_cached_checksummed(asset_url: str, checksum_url: str) ->
             if asset_file.exists() and combsum_file.exists():
                 with open(combsum_file, "r") as cs_f:
                     current_checksum = cs_f.read()
-                    print(f"{fetched_checksum} vs {current_checksum}: {fetched_checksum == current_checksum}")
+                    print(
+                        f"{fetched_checksum} vs {current_checksum}: {fetched_checksum == current_checksum}"
+                    )
                     if fetched_checksum == current_checksum:
                         return None
             return fetched_checksum
