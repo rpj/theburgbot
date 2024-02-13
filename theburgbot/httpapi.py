@@ -1,5 +1,6 @@
 import logging
 import threading
+from collections import defaultdict
 
 import aiohttp_cors
 import aiosqlite
@@ -183,19 +184,23 @@ class TheBurgBotHTTP:
                 with open("templates/twmtg_card_frag.html", "r") as frag:
                     frag_str = frag.read()
 
-                tcgplayer_links = list(
-                    filter(
-                        lambda r: r["link"] is not None,
-                        [
-                            {"set": row["setCode"], "link": row["tcgplayer"]}
-                            for row in records
-                        ],
+                unique_texts = defaultdict(list)
+                for row in records:
+                    row_dict = {**row}
+                    if "text" in row_dict and len(row_dict["text"]):
+                        unique_texts[row_dict["text"]].append(row_dict)
+
+                for same_text_rows in unique_texts.values():
+                    row_copy = {**same_text_rows[0]}
+                    row_copy["tcgplayer_links"] = list(
+                        filter(
+                            lambda r: r["link"] is not None,
+                            [
+                                {"set": row["setCode"], "link": row["tcgplayer"]}
+                                for row in same_text_rows
+                            ],
+                        )
                     )
-                )
-                # XXX: ever going to want to return all? doubtfull...
-                for row in records[:1]:
-                    row_copy = {**row}
-                    row_copy["tcgplayer_links"] = tcgplayer_links
                     row_copy["text"] = row_copy["text"].replace("\\n", "<br/>")
                     if row_copy["legal"]:
                         row_copy["TMPL_legal"] = [True]
