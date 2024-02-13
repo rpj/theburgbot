@@ -14,7 +14,6 @@ from twentywordmtg.populate import mtgjson_sqlite_path
 LOGGER = logging.getLogger("discord")
 
 
-
 class TheBurgBotHTTP:
     thread: threading.Thread
     run: bool = True
@@ -79,13 +78,6 @@ class TheBurgBotHTTP:
     async def shutdown(self):
         await self.app.shutdown()
         await self.app.cleanup()
-
-    async def twmtg_cards(self, req):
-        @audit_log_start_end_async("TWMTG_CARDS_GET", db_path=self.parent.db_path)
-        async def _inner():
-            return await twentywordmagic_cards(req)
-
-        return await _inner()
 
     async def get_static_route_handler(self, req: web.Request):
         @audit_log_start_end_async(
@@ -156,7 +148,6 @@ class TheBurgBotHTTP:
             else:
                 count = await _count(False if "illegal" in req.query else True)
             return web.Response(text=f"{count:,}", content_type="text/html")
-
 
     async def twentywordmagic_cards(self, req: web.Request):
         if "card_name" not in req.query:
