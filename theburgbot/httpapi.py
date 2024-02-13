@@ -1,6 +1,7 @@
 import logging
 import threading
 
+import aiohttp_cors
 import aiosqlite
 import chevron
 from aiohttp import web
@@ -14,6 +15,8 @@ LOGGER = logging.getLogger("discord")
 
 
 async def twentywordmagic_cards(req: web.Request):
+    if "card_name" not in req.query:
+        return
     db_path = await mtgjson_sqlite_path()
     async with aiosqlite.connect(db_path) as db:
         db.row_factory = aiosqlite.Row
@@ -21,15 +24,15 @@ async def twentywordmagic_cards(req: web.Request):
             "select * from cards left join twentyword_cards as tw "
             + "left join cardPurchaseUrls as urls "
             + "where cards.uuid = tw.card_uuid and cards.uuid = urls.uuid and cards.name like ?",
-            (req.match_info["card_name"],),
+            (req.query["card_name"],),
         )
         await db.commit()
 
-        html_out = "<hr>"
+        html_out = ""
         frag_str = None
         with open("templates/twmtg_card_frag.html", "r") as frag:
             frag_str = frag.read()
-        for row in records:
+        for row in records[:1]:
             row_copy = {**row}
             row_copy["text"] = row_copy["text"].replace("\\n", "<br/>")
             if row_copy["legal"]:
@@ -58,7 +61,18 @@ class TheBurgBotHTTP:
         self.parent = parent
         self.redeem_success_cb = redeem_success_cb
         self.port = port
+
         self.app = web.Application()
+        cors_allowed_routes = [web.get("/twentywordmagic/card", twentywordmagic_cards)]
+        self.app_cors = aiohttp_cors.setup(
+            self.app,
+            defaults={
+                "*": aiohttp_cors.ResourceOptions(
+                    allow_credentials=True, expose_headers="*", allow_headers="*"
+                )
+            },
+        )
+
         self.app.add_routes(
             [
                 web.post("/redeem-invite", self.redeem_invite_route_handler),
@@ -66,10 +80,17 @@ class TheBurgBotHTTP:
                     f"/{constants.USER_STATIC_HTTP_PATH}/" "{doc_id}",
                     self.get_static_route_handler,
                 ),
-                web.get("/twentywordmagic/card/{card_name}", twentywordmagic_cards),
+                *cors_allowed_routes,
             ]
         )
-        print(self.app)
+
+        cors_allowed_paths = [route.path for route in cors_allowed_routes]
+        for route in list(self.app.router.routes()):
+            route_info = route.resource.get_info()
+            if "path" in route_info and route_info["path"] in cors_allowed_paths:
+                print(f"Opening up CORS on {route_info['path']}")
+                self.app_cors.add(route)
+
         self.thread = threading.Thread(target=self.thread_runner, daemon=True)
         self.thread.start()
 
