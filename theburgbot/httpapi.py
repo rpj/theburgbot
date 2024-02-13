@@ -168,6 +168,16 @@ class TheBurgBotHTTP:
                 )
                 await db.commit()
 
+                if len(records) == 0:
+                    with open("templates/twmtg_card_not_found_frag.html", "r") as frag:
+                        frag_str = frag.read()
+                        return web.Response(
+                            text=chevron.render(
+                                frag_str, {"card_name": req.query["card_name"]}
+                            ),
+                            content_type="text/html",
+                        )
+
                 html_out = ""
                 frag_str = None
                 with open("templates/twmtg_card_frag.html", "r") as frag:
@@ -189,7 +199,6 @@ class TheBurgBotHTTP:
                     row_copy["text"] = row_copy["text"].replace("\\n", "<br/>")
                     if row_copy["legal"]:
                         row_copy["TMPL_legal"] = [True]
-                    # print(row_copy)
                     html_out += chevron.render(frag_str, row_copy)
                     html_out += "\n"
 
