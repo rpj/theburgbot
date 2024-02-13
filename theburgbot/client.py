@@ -85,7 +85,7 @@ class TheBurgBotClient(commands.Bot):
             redeem_success_cb=redeem_success_cb,
         )
         await self.http_server.setup()
-        
+
         await igdb_refresh_token(
             audit_logger=lambda ev_extra, extra_dict: TheBurgBotDB(
                 self.db_path

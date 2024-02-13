@@ -11,14 +11,28 @@
     {{/TMPL_legal}}
     </h3>
 
-    <div>Number of words: {{ num_words }}</div>
+    <div>Word count: <b>{{ num_words }}</b></div>
 
     <hr/>
 
     <h3 style="font-variant: small-caps;">"{{ name }}"</h3>
 
+    Checked text:
+    <div class="cardText"
+        style="margin: 1em; padding: 1em; border: 1px solid rgb(85, 45, 45); border-radius: 0.2em; background-color: rgb(220, 223, 255)">
+        {{{ legality_checked_text }}}
+    </div>
+    
+    Full text:
     <div class="cardText"
         style="margin: 1em; padding: 1em; border: 1px solid rgb(85, 45, 45); border-radius: 0.2em; background-color: rgb(220, 223, 255)">
         {{{ text }}}
+    </div>
+
+    <div style="font-size: 80%;">
+        Printings:
+        {{#tcgplayer_links}}
+        <a href="{{ link }}" target="_blank">{{ set }}</a>
+        {{/tcgplayer_links}}
     </div>
 </div>

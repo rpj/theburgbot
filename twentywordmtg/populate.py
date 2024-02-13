@@ -43,6 +43,7 @@ async def main():
                 "create table if not exists twentyword_cards ("
                 "card_uuid VARCHAR(36) NOT NULL,"
                 "legal BOOLEAN NOT NULL,"
+                "legality_checked_text text not null,"
                 "num_words INTEGER NOT NULL"
                 ")"
             )
@@ -70,8 +71,8 @@ async def main():
                     num_words = len(text_filtered.split(" "))
                     legal = num_words <= TWENTY
                     await db.execute(
-                        "insert into twentyword_cards values (?, ?, ?)",
-                        (uuid, legal, num_words),
+                        "insert into twentyword_cards values (?, ?, ?, ?)",
+                        (uuid, legal, text_filtered, num_words),
                     )
                     await db.commit()
                 bar()
