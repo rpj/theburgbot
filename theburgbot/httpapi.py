@@ -14,6 +14,29 @@ from twentywordmtg.populate import mtgjson_sqlite_path
 LOGGER = logging.getLogger("discord")
 
 
+async def twentywordmagic_count(req: web.Request):
+    db_path = await mtgjson_sqlite_path()
+    async with aiosqlite.connect(db_path) as db:
+
+        async def _count(legal=True):
+            [(count,)] = await db.execute_fetchall(
+                "select count(*) from cards left join twentyword_cards "
+                + "where cards.uuid = twentyword_cards.card_uuid and twentyword_cards.legal = ?",
+                ("1" if legal else "0"),
+            )
+            await db.commit()
+            return count
+
+        count = None
+        if "total" in req.query:
+            legal = await _count()
+            illegal = await _count(False)
+            count = legal + illegal
+        else:
+            count = await _count(False if "illegal" in req.query else True)
+        return web.Response(text=f"{count:,}", content_type="text/html")
+
+
 async def twentywordmagic_cards(req: web.Request):
     if "card_name" not in req.query:
         return
@@ -63,7 +86,6 @@ class TheBurgBotHTTP:
         self.port = port
 
         self.app = web.Application()
-        cors_allowed_routes = [web.get("/twentywordmagic/card", twentywordmagic_cards)]
         self.app_cors = aiohttp_cors.setup(
             self.app,
             defaults={
@@ -72,6 +94,11 @@ class TheBurgBotHTTP:
                 )
             },
         )
+
+        cors_allowed_routes = [
+            web.get("/twentywordmagic/card", twentywordmagic_cards),
+            web.get("/twentywordmagic/count", twentywordmagic_count),
+        ]
 
         self.app.add_routes(
             [
@@ -88,7 +115,7 @@ class TheBurgBotHTTP:
         for route in list(self.app.router.routes()):
             route_info = route.resource.get_info()
             if "path" in route_info and route_info["path"] in cors_allowed_paths:
-                print(f"Opening up CORS on {route_info['path']}")
+                print(f"Opening up CORS on {route}")
                 self.app_cors.add(route)
 
         self.thread = threading.Thread(target=self.thread_runner, daemon=True)

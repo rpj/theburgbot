@@ -1,27 +1,24 @@
 <div>
-    <h3>{{ name }}</h3>
+    <hr/>
+    <h2><i>Twenty-words</i> ruling:</h2>
+    
+    <h3>
+    {{#TMPL_legal}}
+    <span class="legal" style="color: green; text-shadow: 0px 0px 25px rgb(45, 208, 45);">Legal</span>
+    {{/TMPL_legal}}
+    {{^TMPL_legal}}
+    <span style="color: red; font-variant: small-caps; text-shadow: 0px 0px 25px rgb(215, 90, 90);">Illegal</span>
+    {{/TMPL_legal}}
+    </h3>
+    
+    <div>Number of words: {{ num_words }}</div>
+
+    <hr/>
+
+    <h3 style="font-variant: small-caps;">"{{ name }}"</h3>
 
     <div class="cardText"
         style="margin: 1em; padding: 1em; border: 1px solid rgb(85, 45, 45); border-radius: 0.2em; background-color: rgb(220, 223, 255)">
         {{{ text }}}
     </div>
-    <div>Set: <b>{{ setCode }}</b></div>
-    <div>
-        Links: 
-        <a href="{{{ tcgplayer }}}" target="_blank">TCGPlayer</a>,
-        <a href="{{{ cardKingdom }}}" target="_blank">CardKingdom</a>
-    </div>
-
-    <h2><i>Twenty Words</i> ruling</h2>
-
-    <div>Number of words: {{ num_words }}</div>
-    
-    <h3>
-    {{#TMPL_legal}}
-    <span class="legal" style="color: green;">Legal</span>
-    {{/TMPL_legal}}
-    {{^TMPL_legal}}
-    <span style="color: red; font-variant: small-caps;">Illegal</span>
-    {{/TMPL_legal}}
-    </h3>
 </div>
