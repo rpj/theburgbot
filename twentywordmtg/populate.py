@@ -1,4 +1,5 @@
 import asyncio
+import functools
 import re
 import subprocess
 from pathlib import Path
@@ -31,6 +32,9 @@ async def mtgjson_sqlite_path():
     return asset_uncompressed
 
 
+FILTER_STRINGS = ["This spell costs {1} more to cast for each target beyond the first."]
+
+
 async def main():
     asset_uncompressed = await mtgjson_sqlite_path()
     async with aiosqlite.connect(asset_uncompressed) as db:
@@ -58,7 +62,12 @@ async def main():
                     text_rm_reminder_text = re.sub(
                         r"\s+", " ", re.sub(r"\([^\)]+\)", "", text).strip()
                     )
-                    num_words = len(text_rm_reminder_text.split(" "))
+                    text_filtered = functools.reduce(
+                        lambda t, fs: t.replace(fs, ""),
+                        FILTER_STRINGS,
+                        text_rm_reminder_text,
+                    )
+                    num_words = len(text_filtered.split(" "))
                     legal = num_words <= TWENTY
                     await db.execute(
                         "insert into twentyword_cards values (?, ?, ?)",
