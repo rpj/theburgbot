@@ -14,58 +14,6 @@ from twentywordmtg.populate import mtgjson_sqlite_path
 LOGGER = logging.getLogger("discord")
 
 
-async def twentywordmagic_count(req: web.Request):
-    db_path = await mtgjson_sqlite_path()
-    async with aiosqlite.connect(db_path) as db:
-
-        async def _count(legal=True):
-            [(count,)] = await db.execute_fetchall(
-                "select count(*) from cards left join twentyword_cards "
-                + "where cards.uuid = twentyword_cards.card_uuid and twentyword_cards.legal = ?",
-                ("1" if legal else "0"),
-            )
-            await db.commit()
-            return count
-
-        count = None
-        if "total" in req.query:
-            legal = await _count()
-            illegal = await _count(False)
-            count = legal + illegal
-        else:
-            count = await _count(False if "illegal" in req.query else True)
-        return web.Response(text=f"{count:,}", content_type="text/html")
-
-
-async def twentywordmagic_cards(req: web.Request):
-    if "card_name" not in req.query:
-        return
-    db_path = await mtgjson_sqlite_path()
-    async with aiosqlite.connect(db_path) as db:
-        db.row_factory = aiosqlite.Row
-        records = await db.execute_fetchall(
-            "select * from cards left join twentyword_cards as tw "
-            + "left join cardPurchaseUrls as urls "
-            + "where cards.uuid = tw.card_uuid and cards.uuid = urls.uuid and cards.name like ?",
-            (req.query["card_name"],),
-        )
-        await db.commit()
-
-        html_out = ""
-        frag_str = None
-        with open("templates/twmtg_card_frag.html", "r") as frag:
-            frag_str = frag.read()
-        for row in records[:1]:
-            row_copy = {**row}
-            row_copy["text"] = row_copy["text"].replace("\\n", "<br/>")
-            if row_copy["legal"]:
-                row_copy["TMPL_legal"] = [True]
-            # print(row_copy)
-            html_out += chevron.render(frag_str, row_copy)
-            html_out += "<hr>"
-
-        return web.Response(text=html_out, content_type="text/html")
-
 
 class TheBurgBotHTTP:
     thread: threading.Thread
@@ -96,8 +44,8 @@ class TheBurgBotHTTP:
         )
 
         cors_allowed_routes = [
-            web.get("/twentywordmagic/card", twentywordmagic_cards),
-            web.get("/twentywordmagic/count", twentywordmagic_count),
+            web.get("/twentywordmagic/card", self.twentywordmagic_cards),
+            web.get("/twentywordmagic/count", self.twentywordmagic_count),
         ]
 
         self.app.add_routes(
@@ -120,6 +68,13 @@ class TheBurgBotHTTP:
 
         self.thread = threading.Thread(target=self.thread_runner, daemon=True)
         self.thread.start()
+
+        self.mtgjson_db_path = None
+
+    async def setup(self):
+        # do this here because mtgjson_sqlite_path() makes a request every call (at least one) to mtgjson.com
+        # and also it can block for a LONG time (really should be refactored!)
+        self.mtgjson_db_path = await mtgjson_sqlite_path()
 
     async def shutdown(self):
         await self.app.shutdown()
@@ -180,3 +135,53 @@ class TheBurgBotHTTP:
             print=None,
             access_log=LOGGER,
         )
+
+    async def twentywordmagic_count(self, req: web.Request):
+        async with aiosqlite.connect(self.mtgjson_db_path) as db:
+
+            async def _count(legal=True):
+                [(count,)] = await db.execute_fetchall(
+                    "select count(*) from cards left join twentyword_cards "
+                    + "where cards.uuid = twentyword_cards.card_uuid and twentyword_cards.legal = ?",
+                    ("1" if legal else "0"),
+                )
+                await db.commit()
+                return count
+
+            count = None
+            if "total" in req.query:
+                legal = await _count()
+                illegal = await _count(False)
+                count = legal + illegal
+            else:
+                count = await _count(False if "illegal" in req.query else True)
+            return web.Response(text=f"{count:,}", content_type="text/html")
+
+
+    async def twentywordmagic_cards(self, req: web.Request):
+        if "card_name" not in req.query:
+            return
+        async with aiosqlite.connect(self.mtgjson_db_path) as db:
+            db.row_factory = aiosqlite.Row
+            records = await db.execute_fetchall(
+                "select * from cards left join twentyword_cards as tw "
+                + "left join cardPurchaseUrls as urls "
+                + "where cards.uuid = tw.card_uuid and cards.uuid = urls.uuid and cards.name like ?",
+                (req.query["card_name"],),
+            )
+            await db.commit()
+
+            html_out = ""
+            frag_str = None
+            with open("templates/twmtg_card_frag.html", "r") as frag:
+                frag_str = frag.read()
+            for row in records[:1]:
+                row_copy = {**row}
+                row_copy["text"] = row_copy["text"].replace("\\n", "<br/>")
+                if row_copy["legal"]:
+                    row_copy["TMPL_legal"] = [True]
+                # print(row_copy)
+                html_out += chevron.render(frag_str, row_copy)
+                html_out += "<hr>"
+
+            return web.Response(text=html_out, content_type="text/html")
