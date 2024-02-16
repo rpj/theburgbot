@@ -46,6 +46,7 @@ class TheBurgBotHTTP:
         cors_allowed_routes = [
             web.get("/twentywordmagic/card", self.twentywordmagic_cards),
             web.get("/twentywordmagic/count", self.twentywordmagic_count),
+            web.get("/twentywordmagic/meta", self.twentywordmagic_meta),
         ]
 
         self.app.add_routes(
@@ -128,6 +129,26 @@ class TheBurgBotHTTP:
             print=None,
             access_log=LOGGER,
         )
+
+    async def twentywordmagic_meta(self, req: web.Request):
+        @audit_log_start_end_async("HTTPAPI_TWMTG_META", db_path=self.parent.db_path)
+        async def _inner():
+            async with aiosqlite.connect(self.mtgjson_db_path) as db:
+                [(date, ver)] = await db.execute_fetchall("select * from meta")
+                with open("templates/twmtg_card_meta_frag.html", "r") as frag:
+                    return web.Response(
+                        text=chevron.render(
+                            frag.read(),
+                            {
+                                "ruleset_ver": constants.TWMTG_RULESET_VER,
+                                "mtgjson_date": date,
+                                "mtgjson_ver": ver,
+                            },
+                        ),
+                        content_type="text/html",
+                    )
+
+        return await _inner()
 
     async def twentywordmagic_count(self, req: web.Request):
         @audit_log_start_end_async("HTTPAPI_TWMTG_COUNT", db_path=self.parent.db_path)
